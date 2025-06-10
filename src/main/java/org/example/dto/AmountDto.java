@@ -8,3 +8,4 @@ public class AmountDto {
     private BigDecimal value;
     private String currency;
 }
+

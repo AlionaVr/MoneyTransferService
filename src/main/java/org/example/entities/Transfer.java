@@ -41,3 +41,4 @@ public class Transfer {
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 }
+

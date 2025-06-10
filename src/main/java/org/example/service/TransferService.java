@@ -2,7 +2,6 @@ package org.example.service;
 
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.example.TransferStatus;
 import org.example.dto.TransferRequestDto;
 import org.example.dto.TransferResponseDto;
@@ -17,7 +16,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
-@Slf4j
 @Service
 @AllArgsConstructor
 public class TransferService {
@@ -27,8 +25,6 @@ public class TransferService {
 
     @Transactional
     public TransferResponseDto transfer(TransferRequestDto requestDto) {
-        log.info("Starting transfer operation from card {} to card {}",
-                requestDto.getCardFromNumber(), requestDto.getCardToNumber());
 
         Card cardFrom = cardRepository.findByCardNumber(requestDto.getCardFromNumber())
                 .orElseThrow(() -> new InvalidDataException("Card from not found"));
@@ -48,18 +44,30 @@ public class TransferService {
         BigDecimal total = amount.add(fee);
 
         if (total.compareTo(cardFrom.getBalance()) > 0) {
+            TransferLogger.getInstance().logTransfer(
+                    cardFrom.getCardNumber(),
+                    cardTo.getCardNumber(),
+                    amount.doubleValue(),
+                    fee.doubleValue(),
+                    "FAILED: Insufficient funds"
+            );
             throw new InvalidDataException("Insufficient funds for the transfer including fee");
         }
 
-        // Обновление балансов карт
         cardFrom.setBalance(cardFrom.getBalance().subtract(total));
         cardTo.setBalance(cardTo.getBalance().add(amount));
 
-        // Сохранение обновленных карт
         cardRepository.save(cardFrom);
         cardRepository.save(cardTo);
 
-        // Создание записи о переводе
+        TransferLogger.getInstance().logTransfer(
+                cardFrom.getCardNumber(),
+                cardTo.getCardNumber(),
+                amount.doubleValue(),
+                fee.doubleValue(),
+                "SUCCESS"
+        );
+
         Transfer transfer = new Transfer();
         transfer.setFromCard(cardFrom);
         transfer.setToCard(cardTo);
@@ -70,8 +78,6 @@ public class TransferService {
         transfer.setCreatedAt(LocalDateTime.now());
 
         transferRepository.save(transfer);
-        log.info("Transfer completed successfully. Transfer ID: {}", transfer.getId());
-        // Формирование ответа
         return new TransferResponseDto(transfer.getId(), transfer.getStatus());
     }
 
